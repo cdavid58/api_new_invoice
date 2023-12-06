@@ -287,15 +287,19 @@ class Consecutive(models.Model):
 	@classmethod
 	def consecutive_increment(cls,type_document):
 		profit_percentages = {}
-		prices = {
-			'1': self.pos,
-			'2': self.elec,
-			'3': self.nc,
-			'4': self.nd,
-			'5': self.ne,
-			'6': self.ds,
-			'99': self.hd
+		
+		consecutive = {
+			'1': cls.pos,
+			'2': cls.elec,
+			'3': cls.nc,
+			'4': cls.nd,
+			'5': cls.ne,
+			'6': cls.ds,
+			'99': cls.hd
 		}
+
+
+
 		
 from dateutil.relativedelta import relativedelta
 from datetime import datetime,timedelta

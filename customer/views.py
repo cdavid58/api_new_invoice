@@ -14,3 +14,7 @@ def Get_List_Customer(request):
 @api_view(['GET'])
 def Get_Customer(request):
 	return Response(Customer.get_customer(request.data))
+
+@api_view(['PUT'])
+def Update_Customer(request):
+	return Response(Customer.update_customer(request.data))

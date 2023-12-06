@@ -26,6 +26,29 @@ class Invoice(models.Model):
 		return f"{self.prefix} - {self.number} by {self.branch.name}"
 
 	@classmethod
+	def get_invoice(cls, pk):
+		_invoice = cls.objects.get(pk = pk)
+		serialized_invoice = serializers.serialize('json', [_invoice])
+		invoice = json.loads(serialized_invoice)[0]
+		data = invoice['fields']
+		data['pk_invoice'] = pk
+		list_details = []
+		for i in Details_Invoice.objects.filter(invoice = _invoice):
+			serialized_invoice = serializers.serialize('json', [i])
+			product = json.loads(serialized_invoice)[0]['fields']
+			list_details.append(product)
+		data['details'] = list_details
+		serialized_paymentform = serializers.serialize('json', [Payment_Forms.objects.get(invoice = _invoice)])
+		data['payment_form'] = json.loads(serialized_paymentform)[0]['fields']
+		serialized_customer = serializers.serialize('json', [Customer.objects.get(pk = _invoice.customer.pk)])
+		data['customer'] = json.loads(serialized_customer)[0]['fields']
+		branch = serializers.serialize('json', [Branch.objects.get(pk = _invoice.branch.pk)])
+		data['branch'] = json.loads(branch)[0]['fields']
+		return data
+
+
+
+	@classmethod
 	def annulled_invoice(cls, data):
 		result = False
 		message = None
@@ -37,6 +60,9 @@ class Invoice(models.Model):
 			invoice.save()
 			for i in Details_Invoice.objects.filter(invoice = invoice):
 				i.price = 0
+				i.ipo = 0
+				i.discount = 0
+				i.cost = 0
 				i.save()
 			result = True
 			message = "Success"
@@ -148,7 +174,7 @@ class Details_Invoice(models.Model):
 	code = models.CharField(max_length = 30)
 	name = models.CharField(max_length = 150)
 	quantity = models.IntegerField()
-	tax = models.IntegerField()
+	tax = models.FloatField()
 	cost = models.FloatField()
 	price = models.FloatField()
 	ipo = models.FloatField()

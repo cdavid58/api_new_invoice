@@ -28,6 +28,16 @@ class Type_Document_I(models.Model):
     def __str__(self):
         return self.name
 
+    @classmethod
+    def get_type_document_i(cls):
+        return [
+            {
+                'pk':i.pk,
+                "name":i.name
+            }
+            for i in cls.objects.all()
+        ]
+
 
 class Type_Document(models.Model):
     _id = models.IntegerField()
@@ -92,7 +102,7 @@ class Type_Contract(models.Model):
 
 
     @classmethod
-    def get_type_regimen(cls):
+    def get_type_contract(cls):
         return [
             {
                 'pk':i.pk,
@@ -111,7 +121,7 @@ class Payroll_Type_Document_Identification(models.Model):
 
 
     @classmethod
-    def get_type_regimen(cls):
+    def get_payroll_type_document_identification(cls):
         return [
             {
                 'pk':i.pk,
@@ -131,7 +141,7 @@ class Sub_Type_Worker(models.Model):
 
 
     @classmethod
-    def get_type_regimen(cls):
+    def get_sub_type_worker(cls):
         return [
             {
                 'pk':i.pk,
@@ -149,7 +159,7 @@ class Type_Worker(models.Model):
 
 
     @classmethod
-    def get_type_regimen(cls):
+    def get_type_worker(cls):
         return [
             {
                 'pk':i.pk,
@@ -157,11 +167,6 @@ class Type_Worker(models.Model):
             }
             for i in cls.objects.all()
         ]
-
-
-
-
-
 
 class Payment_Form(models.Model):
     _id = models.IntegerField()

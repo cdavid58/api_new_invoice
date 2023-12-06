@@ -23,3 +23,6 @@ def Get_List_Invoice(request):
 def Annulled_Invoice(request):
 	return Response(Invoice.annulled_invoice(request.data))	
 
+@api_view(['GET'])
+def Get_Invoice(request):
+	return Response(Invoice.get_invoice(request.data['pk_invoice']))

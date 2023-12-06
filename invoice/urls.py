@@ -7,4 +7,5 @@ urlpatterns=[
 	url(r'^Cancel_All_Invoice/$',Cancel_All_Invoice,name="Cancel_All_Invoice"),
 	url(r'^Get_List_Invoice/$',Get_List_Invoice,name="Get_List_Invoice"),
 	url(r'^Annulled_Invoice/$',Annulled_Invoice,name="Annulled_Invoice"),
+	url(r'^Get_Invoice/$',Get_Invoice,name="Get_Invoice"),
 ]

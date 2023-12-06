@@ -189,33 +189,63 @@ class Product(models.Model):
 	            profit_amounts[price_field] = 0
 	    return profit_amounts
 
-	@staticmethod
+	# @staticmethod
+	# def calculate_profit_percentages_one_quantity(self):
+	# 	profit_percentages = []
+	# 	prices = {
+	# 		'Precio 1': self.price_1,
+	# 		'Precio 2': self.price_2,
+	# 		'Precio 3': self.price_3,
+	# 	}
+	# 	n = 1
+	# 	for price_field, price in prices.items():
+	# 		try:
+	# 			if price == self.cost:
+	# 				profit_percentage = 0  # If price equals cost, profit percentage is 0
+	# 			else:
+	# 				profit_percentage = (((price - self.cost) / price) * 100)
+	# 			profit_percentages.append({
+	# 				'percentage': f'{profit_percentage:.1f}%',
+	# 				"name": price_field,
+	# 				'id':n
+	# 				})
+	# 		except ZeroDivisionError as e:
+	# 			profit_percentages.append({
+	# 				'percentage':'0%',
+	# 				"name": price_field,
+	# 				'id':n
+	# 			})
+	# 		n += 1
+
+	# 	return profit_percentages
+
 	def calculate_profit_percentages_one_quantity(self):
 		profit_percentages = []
 		prices = {
-			'Precio 1': self.price_1,
-			'Precio 2': self.price_2,
-			'Precio 3': self.price_3,
+		    'Precio 1': self.price_1,
+		    'Precio 2': self.price_2,
+		    'Precio 3': self.price_3,
 		}
 		n = 1
 		for price_field, price in prices.items():
-			try:
-				if price == self.cost:
-					profit_percentage = 0  # If price equals cost, profit percentage is 0
-				else:
-					profit_percentage = (((price - self.cost) / price) * 100)
-				profit_percentages.append({
-					'percentage': f'{profit_percentage:.1f}%',
-					"name": price_field,
-					'id':n
-					})
-			except ZeroDivisionError as e:
-				profit_percentages.append({
-					'percentage':'0%',
-					"name": price_field,
-					'id':n
-				})
-			n += 1
+		    try:
+		        discounted_price = price - (price * (self.discount / 100))
+		        if discounted_price == self.cost:
+		            profit_percentage = 0  # If price equals cost after discount, profit percentage is 0
+		        else:
+		            profit_percentage = (((discounted_price - self.cost) / discounted_price) * 100)
+		        profit_percentages.append({
+		            'percentage': f'{profit_percentage:.1f}%',
+		            'name': price_field,
+		            'id': n
+		        })
+		    except ZeroDivisionError as e:
+		        profit_percentages.append({
+		            'percentage': '0%',
+		            'name': price_field,
+		            'id': n
+		        })
+		    n += 1
 
 		return profit_percentages
 
