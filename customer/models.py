@@ -34,6 +34,18 @@ class Customer(models.Model):
 	        return s
 
 	@classmethod
+	def delete_client(cls, data):
+		result = False
+		message = None
+		try:
+			cls.objects.get(pk = data['pk_customer']).delete()
+			result = True
+			message = "Success"
+		except cls.DoesNotExist as e:
+			message = str(e)
+		return {'result':result, 'message':message}
+
+	@classmethod
 	def create_customer(cls, data):
 		result = False
 		message = None
