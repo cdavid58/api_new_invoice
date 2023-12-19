@@ -408,17 +408,61 @@ class History_Product(models.Model):
 		history_product.save()
 
 
+class Product_Reserved(models.Model):
+	product = models.ForeignKey(Product, on_delete=models.CASCADE)
+	quantity = models.IntegerField()
+	user = models.ForeignKey(Employee, on_delete = models.CASCADE)
+
+	@classmethod
+	def reserveding_product(cls,data):
+		user = Employee.objects.get(pk = data['pk_user'])
+		product = Product.objects.get(code = data['pk_product'],branch = user.branch)
+		result = False
+		try:
+			pr = cls.objects.get(product = product, user = user)
+			pr.quantity += int(data['quantity'])
+			pr.save()
+		except cls.DoesNotExist as e:
+			print(e)
+			pr = None
+		if pr is None:
+			pr = cls(product= product, quantity= int(data['quantity']),user = user)
+			pr.save()
+			
+		if product.quantity >= int(data['quantity']):
+			product.quantity -= int(data['quantity'])
+			try:
+				product.save()
+				result = True
+			except Exception as e:
+				print(e)
+				pass
+		return result
 
 
+	@classmethod
+	def return_products(cls,pk_user):
+		pr = cls.objects.filter(user = Employee.objects.get(pk = pk_user))
+		print(pr)
+		for i in pr:
+			p = Product.objects.get(pk = i.product.pk)
+			p.quantity += i.quantity
+			p.save()
+			i.delete()
+		return True
 
-
-
-
-
-
-
-
-
+	@classmethod
+	def return_product(cls, data):
+		user = Employee.objects.get(pk = data['pk_employee'])
+		product = Product.objects.get(code = data['pk_product'], branch = user.branch)		
+		pr = cls.objects.get(product = product, user = user)
+		pr.quantity += int(data['quantity'])
+		product.quantity += int(data['quantity'])
+		product.save()
+		pr.save()
+		if pr.quantity <= 0:
+			pr.delete()
+		return True
 
 
 

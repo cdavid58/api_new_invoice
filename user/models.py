@@ -1,6 +1,6 @@
 from django.utils.crypto import get_random_string
 from django.db import models
-from company.models import Branch
+from company.models import Branch, License
 from setting.models import *
 from django.core import serializers
 from django.http import JsonResponse
@@ -39,27 +39,31 @@ class Employee(models.Model):
         message = None
         try:
             e = cls.objects.get(pk = data['pk_employee'])
-            e.type_worker_id = Type_Worker.objects.get(id = data['type_worker_id'])
-            e.payroll_type_document_identification_id = Payroll_Type_Document_Identification.objects.get(id = data['payroll_type_document_identification_id'])
-            e.municipality_id = Municipalities.objects.get(id = data['municipality_id'])
-            e.type_contract_id = Type_Contract.objects.get(id = data['type_contract_id'])
-            e.identification_number = data['identification_number']
-            e.surname = data['surname']
-            e.second_surname = data['second_surname']
-            e.first_name = data['names'] 
-            e.address = data['address']
-            # e.integral_salary = data['integral_salary']
-            e.salary = data['salary']
-            e.email = data['email']
-            e.branch = e.branch
-            e.user_name = data['user_name'].lower()
-            e.psswd = get_random_string(length=20) if data['psswd'] is None else data['psswd']
-            e.save()
-            e.permission.clear()
-            for i in data['permissions']:
-                e.permission.add(Permission.objects.get(pk=i)) 
-            result = True
-            message = "Success"
+            validate = License.validate_date(e.branch)
+            if validate['result']:
+                e.type_worker_id = Type_Worker.objects.get(id = data['type_worker_id'])
+                e.payroll_type_document_identification_id = Payroll_Type_Document_Identification.objects.get(id = data['payroll_type_document_identification_id'])
+                e.municipality_id = Municipalities.objects.get(id = data['municipality_id'])
+                e.type_contract_id = Type_Contract.objects.get(id = data['type_contract_id'])
+                e.identification_number = data['identification_number']
+                e.surname = data['surname']
+                e.second_surname = data['second_surname']
+                e.first_name = data['names'] 
+                e.address = data['address']
+                # e.integral_salary = data['integral_salary']
+                e.salary = data['salary']
+                e.email = data['email']
+                e.branch = e.branch
+                e.user_name = data['user_name'].lower()
+                e.psswd = get_random_string(length=20) if data['psswd'] is None else data['psswd']
+                e.save()
+                e.permission.clear()
+                for i in data['permissions']:
+                    e.permission.add(Permission.objects.get(pk=i)) 
+                result = True
+                message = "Success"
+            else:
+                message = validate['message']
         except cls.DoesNotExist as e:
             message = str(e)
             e = None
@@ -74,19 +78,24 @@ class Employee(models.Model):
             employee = cls.objects.get(user_name=data['user_name'].lower(), psswd= data['psswd'])
         except cls.DoesNotExist as e:
             message = str(e)
+            print(e)
             employee = None
         data = {'result':result, 'message':message}
         if employee is not None:
             if not employee.active:
-                result = True
-                message = "Success"
-                employee.active = True
-                employee.save()
-                data = {
-                    'result':result, 'message':message, 'pk_employee': employee.pk, 'name': f"{employee.first_name} {employee.surname}",
-                    "pk_branch":employee.branch.pk, "name_branch": employee.branch.name, 'logo': env.URL_LOCAL + employee.branch.company.logo.url
-                }
-                data['permission'] = [ i.name for i in employee.permission.all()]
+                validate = License.validate_date(employee.branch)
+                if validate['result']:
+                    result = True
+                    message = "Success"
+                    employee.active = True
+                    employee.save()
+                    data = {
+                        'result':result, 'message':message, 'pk_employee': employee.pk, 'name': f"{employee.first_name} {employee.surname}",
+                        "pk_branch":employee.branch.pk, "name_branch": employee.branch.name, 'logo': env.URL_LOCAL + employee.branch.company.logo.url
+                    }
+                    data['permission'] = [ i.name for i in employee.permission.all()]
+                else:
+                    data = {'result':result, 'message':validate['message']}
             else:
                 data = {'result':result, 'message':"Ya tiene la cuenta abierta en otro dispositivo"}
         return data
@@ -113,35 +122,44 @@ class Employee(models.Model):
         except cls.DoesNotExist as e:
             employee = None
 
-        if employee is None:
-            employee = cls(
-                type_worker_id = Type_Worker.objects.get(id = data['type_worker_id']),
-                sub_type_worker_id = Sub_Type_Worker.objects.get(id = data['sub_type_worker_id']),
-                payroll_type_document_identification_id = Payroll_Type_Document_Identification.objects.get(id = data['payroll_type_document_identification_id']),
-                municipality_id = Municipalities.objects.get(id = data['municipality_id']),
-                type_contract_id = Type_Contract.objects.get(id = data['type_contract_id']),
-                high_risk_pension = data['high_risk_pension'],
-                identification_number = data['identification_number'],
-                surname = data['surname'],
-                second_surname = data['second_surname'],
-                first_name = data['first_name'],
-                middle_name = data['middle_name'],
-                address = data['address'],
-                integral_salary = data['integral_salary'],
-                salary = data['salary'],
-                email = data['email'],
-                branch = cls.objects.get(pk = data['pk_user']).branch,
-                user_name = data['user_name'].lower(),
-                psswd = get_random_string(length=20) if data['psswd'] is None else data['psswd']
-            )
-            employee.save()
-            result = True
-            for i in data['permission']:
-                employee.permission.add(Permission.objects.get(_id = i))
-            message = "Success"
-            _data = json.loads(cls.get_employee_serialized(data['pk_user']).content.decode('utf-8'))[0]['fields']
-            History_Employee.register_movement("Created",_data,data)
-
+        branch = cls.objects.get(pk = data['pk_employee']).branch
+        license = License.objects.get(branch=branch)
+        validate = License.validate_date(branch)
+        if validate['result']:
+            if license.user > 0:
+                if employee is None:
+                    employee = cls(
+                        type_worker_id = Type_Worker.objects.get(id = data['type_worker_id']),
+                        sub_type_worker_id = Sub_Type_Worker.objects.get(id = data['sub_type_worker_id']),
+                        payroll_type_document_identification_id = Payroll_Type_Document_Identification.objects.get(id = data['payroll_type_document_identification_id']),
+                        municipality_id = Municipalities.objects.get(id = data['municipality_id']),
+                        type_contract_id = Type_Contract.objects.get(id = data['type_contract_id']),
+                        high_risk_pension = data['high_risk_pension'],
+                        identification_number = data['identification_number'],
+                        surname = data['surname'],
+                        second_surname = data['second_surname'],
+                        first_name = data['first_name'],
+                        middle_name = None,
+                        address = data['address'],
+                        integral_salary = data['integral_salary'],
+                        salary = data['salary'],
+                        email = data['email'],
+                        branch = branch,
+                        user_name = data['user_name'].lower(),
+                        psswd = get_random_string(length=20) if data['psswd'] is None else data['psswd']
+                    )
+                    employee.save()
+                    License.discount_user(branch)
+                    result = True
+                    for i in data['permissions']:
+                        employee.permission.add(Permission.objects.get(pk = i))
+                    message = "Success"
+                    _data = json.loads(cls.get_employee_serialized(data['pk_employee']).content.decode('utf-8'))[0]['fields']
+                    History_Employee.register_movement("Created",_data,data)
+            else:
+                message = "Sorry, there are no more users"
+        else:
+            message = validate['message']
         return {'result':result, 'message':message}
 
     @staticmethod
@@ -169,6 +187,25 @@ class Employee(models.Model):
         except Exception as e:
             message = str(e)
         return data
+
+    @classmethod
+    def delete_user(cls, data):
+        result = False
+        message = None
+        try:
+            employee = cls.objects.get(pk=data['pk_employee'])
+            validate = License.validate_date(employee.branch)
+            if validate['result']:
+                License.add_user(employee.branch)
+                employee.delete()
+                result = True
+                message = "Success"
+            else:
+                message = validate['message']
+        except cls.DoesNotExist as e:
+            employee = str(e)
+            print(employee)
+        return {'result':result, 'message':message}
 
     @classmethod
     def get_employee(cls, data):

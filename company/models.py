@@ -1,7 +1,8 @@
 from django.utils.crypto import get_random_string
-from setting.models import *
+from datetime import datetime, timedelta
 from django.db import IntegrityError
 from django.db import models
+from setting.models import *
 import json, requests
 
 class Company(models.Model):
@@ -129,6 +130,26 @@ class Resolution(models.Model):
 	date_from = models.CharField(max_length = 10, null = True, blank = True)
 	date_to = models.CharField(max_length = 10, null = True, blank = True)
 	branch = models.ForeignKey(Branch, on_delete = models.CASCADE)
+
+	@classmethod
+	def get_resolution(cls, data):
+		resolution = cls.objects.get(type_document_id = data['type_document'], branch = Branch.objects.get(pk = data['pk_branch']))
+		return {'number': resolution._from, "prefix": resolution.prefix}
+
+	@classmethod
+	def add_number(cls, data):
+		print(data)
+		resolution = cls.objects.get(type_document_id = data['type_document'], branch = Branch.objects.get(pk = data['pk_branch']))
+		result = False
+		message = None
+		if resolution._from <= resolution._to:
+			resolution._from += 1
+			resolution.save()
+			result = True
+			message = "Success"
+		else:
+			message = "Ya ha consumido todo el rango de numeración de su resolución, se le informa que debe generar otra resolución"
+		return {'result':result, 'message':message}
 
 	@classmethod
 	def create_resolution(cls,data, branch):
@@ -374,6 +395,56 @@ class License(models.Model):
 			message = str(e)
 		return {'result':result, 'message':message}
 
+
+	@classmethod
+	def validate_date(cls,branch):
+		license = cls.objects.get(branch = branch).expiration_date
+		license_date  = datetime.strptime(license, '%Y-%m-%d')
+		current_date = datetime.now()
+		date_difference = license_date - current_date
+		days_until_expiration = abs(date_difference.days)
+		message = None
+		result = False
+		if date_difference.days < 0:
+			message = "Su licencia esta expirada"
+		else:
+			result = True
+			message = "Success"
+		return {'result':result, 'message': message}
+		
+
+
+	@classmethod
+	def add_user(cls,branch):
+		result = False
+		message = None
+		try:
+			license = cls.objects.get(branch = branch)
+			license.user += 1
+			license.save()
+			result = True
+			message = "Success"
+		except Exception as e:
+			message = str(e)
+		return {'result':result, 'message':message}
+
+	@classmethod
+	def discount_user(cls,branch):
+		result = False
+		message = None
+		try:
+			license = cls.objects.get(branch = branch)
+			if license.user > 0:
+				license.user -= 1
+				license.save()
+				result = True
+				message = "Success"
+			else:
+				message = "Ya no tiene más usuarios disponibles"
+		except Exception as e:
+			print(e)
+			message = str(e)
+		return {'result':result, 'message':message}
 
 	@classmethod
 	def discount_license(cls, branch):

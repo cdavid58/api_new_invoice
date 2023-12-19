@@ -1,6 +1,6 @@
 from django.db import models
 from user.models import Employee
-from company.models import Branch, License
+from company.models import Branch, License, Resolution
 from inventory.models import Product
 from customer.models import Customer
 from django.core import serializers
@@ -15,7 +15,7 @@ class Invoice(models.Model):
 	date = models.CharField(max_length = 12) 
 	time = models.TimeField(auto_now_add = True)
 	total = models.FloatField(null = True, blank = True)
-	note = models.TextField()
+	note = models.TextField(null = True, blank = True)
 	customer = models.ForeignKey(Customer, on_delete = models.CASCADE)
 	cancelled = models.BooleanField(default = True)
 	hidden = models.BooleanField(default = False)
@@ -36,14 +36,21 @@ class Invoice(models.Model):
 		for i in Details_Invoice.objects.filter(invoice = _invoice):
 			serialized_invoice = serializers.serialize('json', [i])
 			product = json.loads(serialized_invoice)[0]['fields']
+			product['subtotals'] = (product['price'] + product['ipo']) * product['quantity']
 			list_details.append(product)
 		data['details'] = list_details
 		serialized_paymentform = serializers.serialize('json', [Payment_Forms.objects.get(invoice = _invoice)])
+		print(serialized_paymentform)
 		data['payment_form'] = json.loads(serialized_paymentform)[0]['fields']
+		data['metod'] = "Crédito" if data['payment_form'] == 2 else "Efectivo"
 		serialized_customer = serializers.serialize('json', [Customer.objects.get(pk = _invoice.customer.pk)])
 		data['customer'] = json.loads(serialized_customer)[0]['fields']
-		branch = serializers.serialize('json', [Branch.objects.get(pk = _invoice.branch.pk)])
+		_branch = Branch.objects.get(pk = _invoice.branch.pk)
+		branch = serializers.serialize('json', [_branch])
 		data['branch'] = json.loads(branch)[0]['fields']
+		resolution = serializers.serialize('json', [Resolution.objects.get(branch= _branch, type_document_id = data['type_document'])])
+		data['resolution'] = json.loads(resolution)[0]['fields']
+
 		return data
 
 
@@ -53,27 +60,28 @@ class Invoice(models.Model):
 		result = False
 		message = None
 		try:
-			invoice = cls.objects.get(pk = data['pk_invoice'])
+			invoice = cls.objects.get(pk = data['pk_invoice'], annulled = False)
 			invoice.total = 0
 			invoice.annulled = True
 			invoice.state = "Factura Anulada."
 			invoice.save()
 			for i in Details_Invoice.objects.filter(invoice = invoice):
+				product = Product.objects.get(code = i.code)
+				product.quantity += i.quantity
+				product.save()
+				i.quantity = 0
 				i.price = 0
 				i.ipo = 0
 				i.discount = 0
-				i.cost = 0
+				i.cost = 0				
 				i.save()
 			result = True
 			message = "Success"
-
 			employee = Employee.objects.get(pk = data['pk_employee'])
 			serialized_employee = serializers.serialize('json', [employee])
 			employee = json.loads(serialized_employee)[0]['fields']
-
 			serialized_invoice = serializers.serialize('json', [invoice])
 			invoice = json.loads(serialized_invoice)[0]['fields']
-			
 			History_Invoice.create_history_invoice(invoice, employee, 'Annulled')
 		except Exception as e:
 			message = str(e)
@@ -101,6 +109,7 @@ class Invoice(models.Model):
 				for i in cls.objects.filter(branch = branch, type_document = data['type_document'])
 			]
 		except Exception as e:
+			print(e)
 			message = str(e)
 			_data = []
 		return _data
@@ -111,6 +120,7 @@ class Invoice(models.Model):
 		message = None
 		employee = Employee.objects.get(pk = data['pk_employee'])
 		total = 0
+		pk_invoice = None
 		try:
 			license = License.discount_license(employee.branch)
 			if license['result']:
@@ -122,15 +132,16 @@ class Invoice(models.Model):
 					date = data['date'],
 					note = data['note'],
 					customer = Customer.objects.get(pk = data['pk_client']),
-					hidden = True if data['type_document'] == 99 else False
+					hidden = True if data['type_document'] == 99 else False,
+					state = data['state']
 				)
 				invoice.save()
+				pk_invoice = invoice.pk
 				result = True
 				message = "Success"
 				if result:
 					for i in data['details']:
 						value = Details_Invoice.create_details(i, invoice)
-						print(value)
 						if not value['result']:
 							result = False
 							message = value['message']
@@ -147,12 +158,15 @@ class Invoice(models.Model):
 						pass
 				invoice.total = total
 				invoice.save()
+				data = {'type_document':data['type_document'], 'pk_branch':employee.branch.pk}
+				Resolution.add_number(data)
 			else:
 				result = license['result']
 				message = license['message']
 		except Exception as e:
+			print(e,'error resolution')
 			message = str(e)
-		return {'result':result, 'message':message}
+		return {'result':result, 'message':message,'pk_invoice': pk_invoice}
 
 	@classmethod
 	def get_list_invoice_credit(cls, branch):
@@ -188,10 +202,10 @@ class Details_Invoice(models.Model):
 		try:
 			details_invoice = cls(
 				code = data['code'],
-				name = data['name'],
+				name = data['product'],
 				quantity = data['quantity'],
 				tax = data['tax'],
-				cost = data['cost'],
+				cost = 0,
 				price = data['price'],
 				ipo = data['ipo'],
 				discount = data['discount'],
@@ -210,6 +224,7 @@ class Details_Invoice(models.Model):
 						return {'result':result, 'message':message}
 		except Exception as e:
 			message = str(e)
+			print(e)
 
 		return {'result':result, 'message':message,'total':data['price']}
 
@@ -226,9 +241,9 @@ class Payment_Forms(models.Model):
 		message = None
 		try:
 			payment_form = cls(
-				payment_form = Payment_Form.objects.get(_id = data['payment_form']['payment_form']),
-				payment_method = Payment_Method.objects.get(_id = data['payment_form']['payment_method']),
-				payment_due_date = data['payment_form']['payment_due_date'],
+				payment_form = Payment_Form.objects.get(_id = data['payment_form']['paymentform']),
+				payment_method = Payment_Method.objects.get(_id = data['payment_form']['paymentmethod']),
+				payment_due_date = data['payment_form']['due_date'],
 				invoice = invoice
 			)
 			payment_form.save()
@@ -250,6 +265,7 @@ class Payment_Forms(models.Model):
 			result = value['result']
 			message = value['message']
 		except Exception as e:
+			print(e)
 			message = f"{e} - Error Payment Form"
 		return {'result':result, 'message':message}
 

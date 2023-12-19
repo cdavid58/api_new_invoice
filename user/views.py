@@ -26,3 +26,7 @@ def LogOut(request):
 @api_view(['PUT'])
 def Update_User(request):
 	return Response(Employee.Update_User(request.data))
+
+@api_view(['DELETE'])
+def Delete_User(request):
+	return Response(Employee.delete_user(request.data))
