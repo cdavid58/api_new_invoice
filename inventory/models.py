@@ -367,6 +367,7 @@ class Product(models.Model):
 
 	@classmethod
 	def get_list_products(cls, data):
+		print(data)
 		branch = Employee.objects.get(pk = data['pk_employee']).branch
 		list_products = []
 		for i in cls.objects.filter(branch = branch):

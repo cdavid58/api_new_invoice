@@ -40,7 +40,6 @@ class Invoice(models.Model):
 			list_details.append(product)
 		data['details'] = list_details
 		serialized_paymentform = serializers.serialize('json', [Payment_Forms.objects.get(invoice = _invoice)])
-		print(serialized_paymentform)
 		data['payment_form'] = json.loads(serialized_paymentform)[0]['fields']
 		data['metod'] = "Crédito" if data['payment_form'] == 2 else "Efectivo"
 		serialized_customer = serializers.serialize('json', [Customer.objects.get(pk = _invoice.customer.pk)])

@@ -196,7 +196,6 @@ class Resolution(models.Model):
 
 	@classmethod
 	def add_number(cls, data):
-		print(data)
 		resolution = cls.objects.get(type_document_id = data['type_document'], branch = Branch.objects.get(pk = data['pk_branch']))
 		result = False
 		message = None
@@ -253,16 +252,17 @@ class Resolution(models.Model):
 		result = False
 		message = None
 		try:
-			_url = Operation.objects.get(pk = 1).url_api
-			url = f"{_url}/api/ubl2.1/config/resolution"
-			payload = json.dumps(data)
-			headers = {
-			  'Content-Type': 'application/json',
-			  'accept': 'application/json',
-			  'Authorization': 'Bearer '+str(branch.company.token)
-			}
-			response = requests.request("PUT", url, headers=headers, data=payload)
-			print(response.text)
+			if data['type_document_id'] != 98:
+				_url = Operation.objects.get(pk = 1).url_api
+				url = f"{_url}/api/ubl2.1/config/resolution"
+				payload = json.dumps(data)
+				headers = {
+				  'Content-Type': 'application/json',
+				  'accept': 'application/json',
+				  'Authorization': 'Bearer '+str(branch.company.token)
+				}
+				response = requests.request("PUT", url, headers=headers, data=payload)
+				print(response.text)
 			result = True
 			message = "Success"
 		except Exception as e:
@@ -346,6 +346,7 @@ class Consecutive(models.Model):
 	ne = models.IntegerField(default = 1)
 	ds = models.IntegerField(default = 1)
 	hd = models.IntegerField(default = 1)
+	tras = models.IntegerField(default = 1)
 	branch = models.OneToOneField(Branch, on_delete = models.CASCADE, unique=True)
 
 	def __str__(self):
