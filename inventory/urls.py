@@ -7,7 +7,7 @@ urlpatterns=[
 	url(r'^Delete_Product/$',Delete_Product,name="Delete_Product"),
 	url(r'^Product_Reserved_User/$',Product_Reserved_User,name="Product_Reserved_User"),
 	url(r'^Return_Products/$',Return_Products,name="Return_Products"),
-	url(r'^Return_Product/$',Return_Product,name="Return_Product"),
+	url(r'^return_product_UNIQUE/$',return_product_UNIQUE,name="return_product_UNIQUE"),
 	
 	url(r'^Get_List_Products/$',Get_List_Products,name="Get_List_Products"),
 	url(r'^Get_Product/$',Get_Product,name="Get_Product"),

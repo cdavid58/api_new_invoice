@@ -64,5 +64,5 @@ def Return_Products(request):
     return Response(Product_Reserved.return_products(request.data['pk_user']))
 
 @api_view(['PUT'])
-def Return_Product(request):
-    return Response(Product_Reserved.return_product(request.data))
+def return_product_UNIQUE(request):
+    return Response(Product_Reserved.return_product_unique(request.data))

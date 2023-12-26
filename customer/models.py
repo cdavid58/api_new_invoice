@@ -73,6 +73,21 @@ class Customer(models.Model):
 		return {'result':result, 'message':message}
 
 	@classmethod
+	def create_consumidor_final(cls, branch):
+		customer = cls(
+			identification_number = 12345678,
+			dv = 0,
+			name = "Consumidor Final",
+			type_document_i = Type_Document_I.objects.get(pk = 1),
+			type_organization = Type_Organization.objects.get(pk = 1),
+			municipality = Municipalities.objects.get(pk = 1),
+			type_regime = Type_Regimen.objects.get(pk = 1),
+			branch = branch
+		)
+		customer.save()
+
+
+	@classmethod
 	def update_customer(cls, data):
 		result = False
 		message = None

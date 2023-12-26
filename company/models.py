@@ -1,6 +1,7 @@
 from django.utils.crypto import get_random_string
 from datetime import datetime, timedelta
 from django.db import IntegrityError
+from django.core import serializers
 from django.db import models
 from setting.models import *
 import json, requests
@@ -44,6 +45,7 @@ class Company(models.Model):
 		  'Authorization': 'Bearer 7692a20fec92af0aa5729d796b019d27c83c9955407994630a0cdd7702ca2329'
 		}
 		response = requests.request("POST", url, headers=headers, data=payload)
+		print(response.text)
 		return json.loads(response.text)['token']
 
 	@classmethod
@@ -53,25 +55,27 @@ class Company(models.Model):
 		pk = None
 		try:
 			token = cls.create_company_api(cls,data)
-			company = cls(
-				documentI = data['documentI'],
-				name = data['business_name'],
-				address = data['address'],
-				phone = data['phone'],
-				email = data['email'],
-				type_document_identification = Type_Document_I.objects.get(pk = data['type_document_identification_id']),
-				type_organization = Type_Organization.objects.get(pk = data['type_organization_id']),
-				type_regime = Type_Regimen.objects.get(pk = data['type_regime_id']),
-				municipality = Municipalities.objects.get(pk = data['municipality_id']),
-				token = token
-			)
-			company.save()
-			result = True
-			message = "Success"
-			pk = company.pk
-			data['pk_company'] = company.pk
-			Branch.create_branch(data)
-			result = Software.create_software(data,company)
+			if token:
+				company = cls(
+					documentI = data['documentI'],
+					name = data['business_name'],
+					address = data['address'],
+					phone = data['phone'],
+					email = data['email'],
+					type_document_identification = Type_Document_I.objects.get(pk = data['type_document_identification_id']),
+					type_organization = Type_Organization.objects.get(pk = data['type_organization_id']),
+					type_regime = Type_Regimen.objects.get(pk = data['type_regime_id']),
+					municipality = Municipalities.objects.get(pk = data['municipality_id']),
+					token = token,
+					production = data['production'] if data['production'] is not None else False
+				)
+				company.save()
+				result = True
+				message = "Success"
+				pk = company.pk
+				data['pk_company'] = company.pk
+				Branch.create_branch(data)
+				result = Software.create_software(data,company)
 		except IntegrityError as inte:
 			Branch.create_branch(data)
 			message = f"Error IntegrityError Company {inte}"
@@ -89,9 +93,21 @@ class Branch(models.Model):
 	company = models.ForeignKey(Company, on_delete= models.CASCADE)
 	psswd = models.CharField(max_length = 10,default = get_random_string(length=10))
 
-
 	def __str__(self):
 		return f"{self.name} - {self.company.name}"
+
+	@classmethod
+	def list_branch(cls, data):
+		branch = Branch.objects.get(pk=data['pk_branch'])
+		branches_except_2 = Branch.objects.exclude(pk = branch.pk, company = branch.company)
+		_data = []
+		for i in branches_except_2:
+			a = json.loads(serializers.serialize('json', [i]))[0]
+			print(a)
+			_a = a['fields']
+			_a['pk'] = a['pk']
+			_data.append(_a)
+		return _data
 
 	@classmethod
 	def create_branch(cls,data):
@@ -111,11 +127,48 @@ class Branch(models.Model):
 			Resolution.create_resolution(data, branch)
 			result = Consecutive.create_consecutive(branch)
 			result = License.create_license(data, branch)
+			from customer.models import Customer as c
+			c.create_consumidor_final(branch)
+			from inventory.models import Supplier as s
+			s.create_supplier_general(branch)
+
 		except IntegrityError as inte:
 			message = f"Error IntegrityError branch {inte}"
 		except Exception as e:
 			message = str(e)
 		return {'result':result, 'message':message}
+
+	@classmethod
+	def add_branch(cls,data):
+		result = False
+		message = None
+		try:
+			branch = cls.objects.get(name = data['business_name'],company = Company.objects.get(pk = data['pk_company']) )
+			message = "This branch is already registered"
+		except Branch.DoesNotExist as e:
+			branch = None
+		if branch is None:
+			try:
+				branch = cls(
+					name = data['business_name'],
+					address = data['address'],
+					phone = data['phone'],
+					email = data['email'],
+					company = Company.objects.get(pk = data['pk_company'])
+				)
+				branch.save()
+				result = True
+				message = "Success"
+				result = License.create_license(data, branch)
+				Resolution.create_resolution(data, branch)
+				from customer.models import Customer as c
+				c.create_consumidor_final(branch)
+				from inventory.models import Supplier as s
+				s.create_supplier_general(branch)
+			except Exception as e:
+				message = str(e)
+		return {'result':result, 'message':message}
+
 
 
 class Resolution(models.Model):
@@ -133,8 +186,13 @@ class Resolution(models.Model):
 
 	@classmethod
 	def get_resolution(cls, data):
-		resolution = cls.objects.get(type_document_id = data['type_document'], branch = Branch.objects.get(pk = data['pk_branch']))
-		return {'number': resolution._from, "prefix": resolution.prefix}
+		value = None
+		try:
+			resolution = cls.objects.get(type_document_id = data['type_document'], branch = Branch.objects.get(pk = data['pk_branch']))
+			value = json.loads( serializers.serialize('json', [resolution]))[0]['fields']
+		except cls.DoesNotExist as e:
+			value = {}
+		return value
 
 	@classmethod
 	def add_number(cls, data):
@@ -190,7 +248,6 @@ class Resolution(models.Model):
 			result = cls.create_resolution_api(data, branch)
 		return {'result':result, 'message':message}
 
-
 	@staticmethod
 	def create_resolution_api(data, branch):
 		result = False
@@ -217,8 +274,9 @@ class Resolution(models.Model):
 		result = False
 		message = None
 		try:
-			resolution = cls.objects.get(type_document_id=data['type_document_id'], branch = data['pk_branch']) 
-			resolution.type_document_id = data['type_document_id'],
+			branch = Branch.objects.get(pk = data['pk_branch'])
+			resolution = cls.objects.get(type_document_id=data['type_document_id'], branch = branch) 
+			resolution.type_document_id = data['type_document_id']
 			resolution.prefix = data['prefix']
 			resolution.resolution = data['resolution']
 			resolution.resolution_date = data['resolution_date']

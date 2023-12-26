@@ -1,4 +1,5 @@
 from rest_framework.decorators import api_view
+from rest_framework.response import Response
 from django.http import JsonResponse
 from django.shortcuts import render
 from .models import *
@@ -12,7 +13,7 @@ def Create_Company(request):
  
 @api_view(['POST'])
 def Create_Branch(request):
-	return JsonResponse(Company.create_branch(request.data))
+	return JsonResponse(Branch.add_branch(request.data))
  
 @api_view(['PUT'])
 def Update_Resolution(request):
@@ -25,3 +26,7 @@ def Create_Resolution(request):
 @api_view(['GET'])
 def Get_Resolution(request):
 	return JsonResponse(Resolution.get_resolution(request.data))	
+
+@api_view(['GET'])
+def List_Branch(request):
+	return Response(Branch.list_branch(request.data))	

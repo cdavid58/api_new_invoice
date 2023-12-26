@@ -78,7 +78,6 @@ class Employee(models.Model):
             employee = cls.objects.get(user_name=data['user_name'].lower(), psswd= data['psswd'])
         except cls.DoesNotExist as e:
             message = str(e)
-            print(e)
             employee = None
         data = {'result':result, 'message':message}
         if employee is not None:
@@ -122,7 +121,7 @@ class Employee(models.Model):
         except cls.DoesNotExist as e:
             employee = None
 
-        branch = cls.objects.get(pk = data['pk_employee']).branch
+        branch = cls.objects.get(pk = data['pk_employee']).branch if data['pk_employee'] is not None else Branch.objects.get(pk = data['branch'])
         license = License.objects.get(branch=branch)
         validate = License.validate_date(branch)
         if validate['result']:
@@ -154,7 +153,7 @@ class Employee(models.Model):
                     for i in data['permissions']:
                         employee.permission.add(Permission.objects.get(pk = i))
                     message = "Success"
-                    _data = json.loads(cls.get_employee_serialized(data['pk_employee']).content.decode('utf-8'))[0]['fields']
+                    _data = {"System":"Registration was carried out from the system"} if data['pk_employee'] is None else json.loads(cls.get_employee_serialized(data['pk_employee']).content.decode('utf-8'))[0]['fields']
                     History_Employee.register_movement("Created",_data,data)
             else:
                 message = "Sorry, there are no more users"
@@ -169,7 +168,7 @@ class Employee(models.Model):
             serialized_employee = serializers.serialize('json', [employee])
             return JsonResponse(json.loads(serialized_employee), safe=False)
         except Employee.DoesNotExist:
-            return JsonResponse({'error': 'Empleado no encontrado'}, status=404)
+            return JsonResponse({'error': 'Employee not found'}, status=404)
 
     @classmethod
     def get_list_employee(cls,data_):
@@ -204,7 +203,6 @@ class Employee(models.Model):
                 message = validate['message']
         except cls.DoesNotExist as e:
             employee = str(e)
-            print(employee)
         return {'result':result, 'message':message}
 
     @classmethod

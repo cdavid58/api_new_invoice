@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-f-8=z2(m=_fmoq@65sq@)z5r1$kz=l+er#lsjf$w$0zric6qc^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'company','setting','user','inventory',
     'shopping','customer','invoice',
-    'wallet',
+    'wallet','transfers',
 ]
 
 MIDDLEWARE = [
@@ -108,15 +108,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
+TIME_ZONE = 'America/Bogota'
 USE_I18N = True
-
 USE_L10N = True
-
-USE_TZ = True
-
+USE_TZ = False 
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR,'media')
@@ -127,3 +122,8 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR,'static'),]
 CART_SESSION_ID = 'cart'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880

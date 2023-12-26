@@ -35,6 +35,23 @@ class Supplier(models.Model):
 			message = str(e)
 		return {'result': result, 'message':message}
 
+
+	@classmethod
+	def create_supplier_general(cls, branch):
+		result = True
+		message = None
+		try:
+			supplier = cls(
+				name = "Proveedor General",
+				branch = branch
+			)
+			supplier.save()
+			message = "Successs"
+		except Exception as e:
+			message = str(e)
+			print(e)
+		return {'result': result, 'message':message}
+
 	@classmethod
 	def update_supplier(cls,data):
 		result = True
@@ -232,8 +249,15 @@ class Product(models.Model):
 		message = None
 		employee = Employee.objects.get(pk = data['pk_employee'])
 		branch = employee.branch
+		supplier = None
+		try:
+			supplier = Supplier.objects.get(pk = data['pk_supplier'])
+		except Supplier.DoesNotExist as e:
+			print(e)
+		
 		if data['excel'] == 1:
 			cls.Delete_Product_All(cls, branch)
+			supplier = Supplier.objects.get(name = "Proveedor General", branch=branch)
 		try:
 			product = cls.objects.get(branch = branch, code = data['code'])
 			message = "Existo"
@@ -255,7 +279,7 @@ class Product(models.Model):
 				    discount= data['discount'],
 				    branch= employee.branch,
 				    subcategory= SubCategory.objects.get(pk = data['pk_subcategory']),
-				    supplier = Supplier.objects.get(pk = data['pk_supplier'])
+				    supplier = supplier
 				)
 				product.save()
 				result = True
@@ -408,6 +432,8 @@ class History_Product(models.Model):
 		history_product.save()
 
 
+
+from django.db import transaction
 class Product_Reserved(models.Model):
 	product = models.ForeignKey(Product, on_delete=models.CASCADE)
 	quantity = models.IntegerField()
@@ -428,7 +454,8 @@ class Product_Reserved(models.Model):
 		if pr is None:
 			pr = cls(product= product, quantity= int(data['quantity']),user = user)
 			pr.save()
-			
+		if pr.quantity <= 0:
+			pr.delete()
 		if product.quantity >= int(data['quantity']):
 			product.quantity -= int(data['quantity'])
 			try:
@@ -443,7 +470,6 @@ class Product_Reserved(models.Model):
 	@classmethod
 	def return_products(cls,pk_user):
 		pr = cls.objects.filter(user = Employee.objects.get(pk = pk_user))
-		print(pr)
 		for i in pr:
 			p = Product.objects.get(pk = i.product.pk)
 			p.quantity += i.quantity
@@ -452,18 +478,23 @@ class Product_Reserved(models.Model):
 		return True
 
 	@classmethod
-	def return_product(cls, data):
-		user = Employee.objects.get(pk = data['pk_employee'])
-		product = Product.objects.get(code = data['pk_product'], branch = user.branch)		
-		pr = cls.objects.get(product = product, user = user)
-		pr.quantity += int(data['quantity'])
-		product.quantity += int(data['quantity'])
-		product.save()
-		pr.save()
-		if pr.quantity <= 0:
-			pr.delete()
-		return True
-
+	def return_product_unique(cls, data):
+	    user = Employee.objects.get(pk=data['pk_employee'])
+	    product = Product.objects.get(code=data['pk_product'], branch=user.branch)
+	    with transaction.atomic():
+	        _pr = cls.objects.get(product=product, user=user)
+	        number = int(str(data['quantity']).replace('-',''))
+	        if int(data['quantity']) < 0:
+	        	_pr.quantity += 1
+	        	_pr.save()
+	       	else:
+	            _pr.quantity -= 1
+	            _pr.save()
+	        product.quantity += int(data['quantity'])
+	        product.save()
+	        if _pr.quantity <= 0:
+	            _pr.delete()
+	    return True
 
 
 

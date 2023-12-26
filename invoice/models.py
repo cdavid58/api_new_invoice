@@ -69,12 +69,12 @@ class Invoice(models.Model):
 				product = Product.objects.get(code = i.code)
 				product.quantity += i.quantity
 				product.save()
-				i.quantity = 0
-				i.price = 0
-				i.ipo = 0
-				i.discount = 0
-				i.cost = 0				
-				i.save()
+				# i.quantity = 0
+				# i.price = 0
+				# i.ipo = 0
+				# i.discount = 0
+				# i.cost = 0				
+				# i.save()
 			result = True
 			message = "Success"
 			employee = Employee.objects.get(pk = data['pk_employee'])
@@ -164,6 +164,7 @@ class Invoice(models.Model):
 				result = license['result']
 				message = license['message']
 		except Exception as e:
+			print(data)
 			print(e,'error resolution')
 			message = str(e)
 		return {'result':result, 'message':message,'pk_invoice': pk_invoice}
