@@ -20,6 +20,7 @@ class Company(models.Model):
 	production = models.BooleanField(default = False)
 	token = models.CharField(max_length = 100, null = True, blank = True)
 	logo = models.ImageField(upload_to = "Logo_Company", null = True, blank = True,default = "Logo_Company/withOut.png")
+	software_company = models.CharField(max_length = 150, null = True, blank = True)
 
 	def __str__(self):
 		return self.name
@@ -92,6 +93,12 @@ class Branch(models.Model):
 	verified = models.BooleanField(default= False)
 	company = models.ForeignKey(Company, on_delete= models.CASCADE)
 	psswd = models.CharField(max_length = 10,default = get_random_string(length=10))
+	value_coin = models.IntegerField(null= True, blank=True, default= 0)
+	amount_min = models.IntegerField(null= True, blank=True, default= 0)
+
+	@classmethod
+	def get_branch(cls, data):
+		return json.loads(serializers.serialize('json', [Branch.objects.get(pk = data['pk_branch'])]))[0]
 
 	def __str__(self):
 		return f"{self.name} - {self.company.name}"
@@ -184,6 +191,47 @@ class Resolution(models.Model):
 	date_to = models.CharField(max_length = 10, null = True, blank = True)
 	branch = models.ForeignKey(Branch, on_delete = models.CASCADE)
 
+
+	@classmethod
+	def update_resolution_dian(cls,data):
+		result = False
+		message = None
+		branch = Branch.objects.get(pk = data['pk_branch'])
+		url = "http://theriosoft.com:8080/api/ubl2.1/numbering-range"
+		payload = json.dumps({
+		  "NIT": branch.company.documentI,
+		  "IDSoftware": branch.company.software_company
+		})
+		headers = {
+		  'Content-Type': 'application/json',
+		  'accept': 'application/json',
+		  'Authorization': f'Bearer {branch.company.token}'
+		}
+		response = requests.request("POST", url, headers= headers, data=payload)
+		_data = json.loads(response.text)["ResponseDian"]["Envelope"]["Body"]["GetNumberingRangeResponse"]["GetNumberingRangeResult"]["ResponseList"]["NumberRangeResponse"]
+		r = cls.objects.get(type_document_id = data['type_document_id'], branch = branch)
+		r.type_document_id = data['type_document_id']
+		r.prefix = _data['Prefix']
+		r.resolution = _data['ResolutionNumber']
+		r.resolution_date = _data['ResolutionDate']
+		r.technical_key = _data['TechnicalKey']
+		r._from = _data['FromNumber']
+		r._to = _data['ToNumber']
+		r.date_from = _data['ValidDateFrom']
+		r.date_to = _data['ValidDateTo']
+		result = True
+		r.message = "Success"
+		r.save()
+		_data = json.loads(serializers.serialize('json', [r]))[0]
+		_data = _data['fields']
+		_data['pk_branch'] = branch.pk
+		_data['from'] = _data['_from']
+		_data['to'] = _data['_to']
+		print(_data)
+		cls.update_resolution(_data)
+		return {'result':result,'data':_data}
+
+
 	@classmethod
 	def get_resolution(cls, data):
 		value = None
@@ -192,6 +240,23 @@ class Resolution(models.Model):
 			value = json.loads( serializers.serialize('json', [resolution]))[0]['fields']
 		except cls.DoesNotExist as e:
 			value = {}
+		return value
+
+	@classmethod
+	def get_resolution_list(cls, data):
+		value = None
+		try:
+			resolution = cls.objects.filter(branch = Branch.objects.get(pk = data['pk_branch']))
+			value = []
+			for i in resolution:
+				if i.type_document_id != 98:
+					data = json.loads(serializers.serialize('json', [i]))[0]
+					data['from'] = data['fields']['_from']
+					data['to'] = data['fields']['_to']
+					value.append(data)
+		except cls.DoesNotExist as e:
+			value = {}
+		print(value)
 		return value
 
 	@classmethod

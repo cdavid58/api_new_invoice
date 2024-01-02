@@ -30,3 +30,15 @@ def Get_Resolution(request):
 @api_view(['GET'])
 def List_Branch(request):
 	return Response(Branch.list_branch(request.data))	
+
+@api_view(['PUT'])
+def Update_Resolution_DIAN(request):
+	return Response(Resolution.update_resolution_dian(request.data))
+
+@api_view(['GET'])
+def Get_Branch(request):
+	return Response(Branch.get_branch(request.data))	
+
+@api_view(['GET'])
+def Get_Resolution_List(request):
+	return Response(Resolution.get_resolution_list(request.data))	

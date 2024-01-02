@@ -8,4 +8,7 @@ urlpatterns=[
 	url(r'^Create_Branch/$',Create_Branch,name="Create_Branch"),
 	url(r'^Update_Resolution/$',Update_Resolution,name="Update_Resolution"),
 	url(r'^List_Branch/$',List_Branch,name="List_Branch"),
+	url(r'^Update_Resolution_DIAN/$',Update_Resolution_DIAN,name="Update_Resolution_DIAN"),
+	url(r'^Get_Branch/$',Get_Branch,name="Get_Branch"),
+	url(r'^Get_Resolution_List/$',Get_Resolution_List,name="Get_Resolution_List"),
 ]

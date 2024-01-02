@@ -11,8 +11,6 @@ class Transfer(models.Model):
 	number = models.IntegerField(max_length= 10, null=True, blank=True)
 	note = models.TextField(null=True, blank=True)
 
-	
-
 	@classmethod
 	def transfer_products(cls, data):
 		result = False

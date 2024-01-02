@@ -30,3 +30,7 @@ def Update_User(request):
 @api_view(['DELETE'])
 def Delete_User(request):
 	return Response(Employee.delete_user(request.data))
+
+@api_view(['GET'])
+def Query_Permissions(request):
+	return Response(Employee.query_permissions(request.data))

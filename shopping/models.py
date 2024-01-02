@@ -13,6 +13,9 @@ class Shopping(models.Model):
 	branch = models.ForeignKey(Branch, on_delete = models.CASCADE)
 	supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE) 
 	date_registration = models.CharField(max_length = 10)
+	cancelled = models.BooleanField(default = True)
+	annulled = models.BooleanField(default = False)
+	total = models.FloatField(null = True, blank = True)
 
 	def __str__(self):
 		return f"{self.number} by {self.branch.name} - {self.date}"
@@ -33,6 +36,7 @@ class Shopping(models.Model):
 	def create_shopping(cls, data):
 		result = False
 		message = None
+		total = 0
 		try:
 			branch = Employee.objects.get(pk = data['pk_employee']).branch
 			value = License.discount_license(branch)
@@ -48,11 +52,14 @@ class Shopping(models.Model):
 				message = "Success"
 				for i in data['details']:
 					result = Details.create_details(i, shopping)
+					total += result['total']
 					if not result['result']:
 						message = result['message']
 						result = result['result']
 						break
 				result = PaymentFormShopping.create_payment_form(data, shopping)
+				shopping.total = total
+				shopping.save()
 				if not result['result']:
 					message = result['message']
 					result = result['result']
@@ -88,6 +95,7 @@ class Details(models.Model):
 	def create_details(cls,data,shopping):
 		result = False
 		message = None
+		total = 0
 		try:
 			details = cls(
 				code= data['code'],
@@ -107,11 +115,12 @@ class Details(models.Model):
 			message= "Success"
 			if result:
 				result = cls.update_product_by_shopping(data, shopping)
+			total += int(data['price_1']) * int(data['quantity'])
 			message = result['message']
 			result = result['result']
 		except Exception as e:
 			message = str(e)
-		return {'result':result, 'message':message}
+		return {'result':result, 'message':message,'total':total}
 
 
 	@staticmethod
@@ -156,30 +165,163 @@ class PaymentFormShopping(models.Model):
 				payment_due_date = data['payment_form']['payment_due_date']
 			)
 			payment_form.save()
-			result = True
-			message = "Success"
 			employee = Employee.objects.get(pk = data['pk_employee'])
-			serialized_product = serializers.serialize('json', [employee])
-			employee = json.loads(serialized_product)[0]['fields']
-			value = History_Shopping.create_history(data,employee)
+			if int(data['payment_form']['pk_paymentform']) == 2:
+				shopping.cancelled = False
+				shopping.save()
+				_data = {
+					"pk_shopping": shopping.pk,
+					"amount":0,
+					"note":"There are no pass yet",
+					"pk_employee": employee.pk
+				}
+				Pass.create_pass(_data)
+				result = True
+				message = "Success"
+			else:
+				serialized_product = serializers.serialize('json', [employee])
+				employee = json.loads(serialized_product)[0]['fields']
+				serialized_supplier = serializers.serialize('json', [shopping.supplier])
+				supplier = json.loads(serialized_supplier)[0]['fields']
+				serialized_shopping = serializers.serialize('json', [shopping])
+				_shopping = json.loads(serialized_shopping)[0]['fields']
+			value = History_Shopping.create_history(_shopping, supplier, employee)
 			result = value['result']
 			message = value['message']
 		except Exception as e:
-			message = str(e)
+			message = str(e)+" employee not found"
 		return {'result':result, 'message':message}
 
-class History_Shopping(models.Model):
-	invoice = models.JSONField()
-	employee = models.JSONField()
-	date_registration = models.DateTimeField(auto_now_add = True)
+class Pass(models.Model):
+	number_pass = models.IntegerField()
+	shopping = models.ForeignKey(Shopping, on_delete = models.CASCADE)
+	amount = models.FloatField()
+	date = models.DateTimeField(auto_now_add = True)
+	note = models.TextField()
 
 	@classmethod
-	def create_history(cls,invoice, employee):
+	def create_pass(cls, data):
+		try:
+			number = len(cls.objects.all())
+		except Exception as e:
+			print(e)
+		shopping = Shopping.objects.get(pk = data['pk_shopping'])
+		result = False
+		message = None
+		try:
+			_pass = cls.objects.get(shopping = shopping)
+			if _pass.amount < shopping.total:
+				if float(data['amount']) <= (shopping.total - _pass.amount) and float(data['amount']) > 0:
+					_pass.amount += float(data['amount'])
+					message = "Credit to the invoice was accepted"
+					result = True
+				else:
+					message = "You cannot pay more than the total invoice"
+		except cls.DoesNotExist as e:
+			_pass = cls(
+				number_pass = number if number > 0 else 1,
+				shopping = shopping,
+				amount = data['amount'],
+				note = data['note']
+			)
+			message = f"Credit to the invoice {shopping.number} was created successfully"
+			result = True
+		_pass.save()
+		if _pass.amount == shopping.total:
+			shopping.cancelled = True
+			shopping.save()
+			message = "The invoice has already been canceled"
+
+		serialized_invoice = serializers.serialize('json', [shopping])
+		serialized_supplier = serializers.serialize('json', [shopping.supplier])
+		employee = Employee.objects.get(pk = data['pk_employee'])
+		serialized_product = serializers.serialize('json', [employee])
+		employee = json.loads(serialized_product)[0]['fields']
+		supplier = json.loads(serialized_supplier)[0]['fields']
+		shopping = json.loads(serialized_invoice)[0]['fields']
+		if result:
+			History_Shopping.create_history(shopping, supplier, employee)
+		return {'result':True, 'message':message}
+
+	@classmethod
+	def cancel_all_invoices(cls, data):
+		employee = Employee.objects.get(pk = data['pk_employee'])
+		supplier = Supplier.objects.get(pk = data['pk_supplier'])
+		shopping = Shopping.objects.filter(branch= employee.branch, cancelled = False, supplier = supplier)
+		total = 0
+		result = False
+		message = None
+		amount = data['amount']
+		for i in shopping:
+			total += i.total
+		if total == amount:
+			for i in shopping:
+				_pass = cls.objects.get(shopping = i)
+				_pass.amount = i.total
+				_pass.save()
+				i.cancelled = True
+				i.save()
+				result = True
+				message = "Invoice paid"
+		else:
+			note = None
+			for i in shopping:
+				if amount >= i.total:
+					_pass = cls.objects.get(shopping = i)
+					_pass.amount = i.total
+					amount -= i.total
+					i.cancelled = True
+					_pass.save()
+					note = "Pago factura"
+					serialized_shopping = serializers.serialize('json', [i])
+					serialized_customer = serializers.serialize('json', [i.supplier])
+					supplier = json.loads(serialized_customer)[0]['fields']
+					_shopping = json.loads(serialized_shopping)[0]['fields']
+					_employee = serializers.serialize('json', [employee])
+					__employee = json.loads(_employee)[0]['fields']
+					History_Pass.create_history_pass(_shopping, data['amount'], supplier, note , __employee)
+					result = True
+					message = "Invoice paid"
+				else:
+					_pass = cls.objects.get(shopping = i)
+					_pass.amount += amount
+					_pass.save()
+					note = "Abona a la factura"
+					serialized_shopping = serializers.serialize('json', [i])
+					serialized_customer = serializers.serialize('json', [i.supplier])
+					supplier = json.loads(serialized_customer)[0]['fields']
+					_shopping = json.loads(serialized_shopping)[0]['fields']
+					_employee = serializers.serialize('json', [employee])
+					__employee = json.loads(_employee)[0]['fields']
+					History_Pass.create_history_pass(_shopping, data['amount'], supplier, note , __employee)
+					result = True
+					message = "Invoice paid"
+					if not _pass.shopping.cancelled:
+						amount -= _pass.amount
+						if amount <= 0:
+							break
+				i.save()
+		
+		return {'result':result, 'message':message,"returned_value":amount}
+
+
+class History_Shopping(models.Model):
+	shopping = models.JSONField(null = True, blank = True)
+	employee = models.JSONField(null = True, blank = True)
+	supplier = models.JSONField(null = True, blank = True)
+	date_registration = models.DateTimeField(auto_now_add = True)
+
+	def __str__(self):
+		return f"Number: {self.shopping['number']} - Proveedor: {self.supplier['name']} by {self.employee['user_name'].capitalize()} - {self.date_registration} "
+
+	@classmethod
+	def create_history(cls,shopping, supplier, employee):
 		result = False
 		message = None
 		try:
 			hs = cls(
-				invoice = invoice,
+				shopping = shopping,
+				supplier = supplier,
 				employee = employee
 			)
 			hs.save()
@@ -189,3 +331,30 @@ class History_Shopping(models.Model):
 			message = str(e)
 		return {'result': result, 'message':message}
 
+class History_Pass(models.Model):
+	shopping = models.JSONField(null = True, blank = True)
+	amount = models.FloatField(null = True, blank = True)
+	customer = models.JSONField(null = True, blank = True)
+	employee = models.JSONField(null = True, blank = True)
+	note = models.TextField(null = True, blank = True)
+	date_registration = models.DateTimeField(auto_now_add = True)
+
+	@classmethod
+	def create_history_pass(cls, shopping, amount, customer, note, employee):
+		result = False
+		message = None
+		try:
+			hp = cls(
+				shopping = shopping,
+				amount = amount,
+				customer = customer,
+				note = note,
+				employee = employee
+			)
+			hp.save()
+			result = True
+			message = "Success"
+		except Exception as e:
+			print(e)
+			message = str(e)
+		return {'result':result, 'message':message}

@@ -18,6 +18,8 @@ urlpatterns = [
     url(r'^wallet/', include('wallet.urls')),
     url(r'^setting/', include('setting.urls')),
     url(r'^transfers/', include('transfers.urls')),
+    url(r'^evangeli/', include('evangeli.urls')),
+    url(r'^emails/', include('emails.urls')),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)

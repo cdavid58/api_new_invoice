@@ -34,6 +34,11 @@ class Employee(models.Model):
         return f"{self.first_name} {self.surname}"
 
     @classmethod
+    def query_permissions(cls, data):
+        return [i.name for i in cls.objects.get(pk = data['pk_employee']).permission.all()]
+
+
+    @classmethod
     def Update_User(cls, data):
         result = False
         message = None

@@ -112,28 +112,70 @@ class Customer(models.Model):
 			message = str(e)
 		return {'result':result, 'message':message}
 
+
+	@staticmethod
+	def serializers_data(obj):
+		serialized_customer = serializers.serialize('json', [obj])
+		return json.loads(serialized_customer)[0]
+
 	@classmethod
 	def get_list_customer(cls, data):
 		branch = Employee.objects.get(pk = data['pk_employee']).branch
 		list_customer = []
 		for i in cls.objects.filter(branch = branch):
-			serialized_customer = serializers.serialize('json', [i])
-			serialized_customer = json.loads(serialized_customer)[0]
-			data = serialized_customer['fields']
-			data['pk_customer'] = serialized_customer['pk']
+			customer = cls.serializers_data(i)
+			data = customer['fields']
+			data['pk_customer'] = customer['pk']
 			list_customer.append(data)
 		return list_customer
 
 
 	@classmethod
 	def get_customer(cls, data):
-		serialized_customer = json.loads(serializers.serialize('json', [cls.objects.get(pk = data['pk_customer'])]))[0]
-		data = serialized_customer['fields']
+		customer = cls.serializers_data(cls.objects.get(pk = data['pk_customer']))
+		data = customer['fields']
 		data['name_type_document_i'] = Type_Document_I.objects.get(pk = data['type_document_i']).name
 		data['name_type_organization'] = Type_Organization.objects.get(pk = data['type_organization']).name
 		data['name_municipality'] = Municipalities.objects.get(pk = data['municipality']).name
 		data['name_type_regime'] = Type_Regimen.objects.get(pk = data['type_regime']).name
-		data['pk_customer'] = serialized_customer['pk']
+		data['pk_customer'] = customer['pk']
 		return data
 		
-		
+
+class Wallet_Customer(models.Model):
+	amount = models.IntegerField()
+	customer = models.ForeignKey(Customer, on_delete = models.CASCADE)
+	note = models.TextField()
+	date_register = models.DateField(auto_now_add= True)
+	employee = models.ForeignKey(Employee, on_delete = models.CASCADE)
+	coin = models.IntegerField(default = 0, null=True, blank = True)
+
+	@classmethod
+	def update_wallet_customer(cls, data):
+		result = False
+		message = None
+		try:
+			wallet_c = cls.objects.get(customer=Customer.objects.get(pk = data['pk_customer']))
+			wallet_c.amount += data['amount']
+			wallet_c.save()
+		except Exception as e:
+			print(e)
+		return {'result':result, 'message':message}
+
+	@classmethod
+	def update_coins(cls, data):
+		result = False
+		message = None
+		try:
+			customer = Customer.objects.get(pk = data['pk_customer'])
+			if data['amount_invoice'] >= customer.branch.amount_min:
+				wallet_c = cls.objects.get(customer = customer)
+				wallet_c.coin += int(data['amount_invoice'] / customer.branch.value_coin)
+				wallet_c.save()
+				result = True
+				message = "Success"
+		except Exception as e:
+			print(e)
+		return {'result':result, 'message':message,'coin_generate':wallet_c.coin}
+
+

@@ -1,7 +1,7 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.http import JsonResponse
-from .models import Shopping
+from .models import *
 
 @api_view(['POST'])
 def Create_Shopping(request):
@@ -11,3 +11,10 @@ def Create_Shopping(request):
 def Verified_Invoice(request):
 	return Response(Shopping.verified_invoice(request.data))	
 
+@api_view(['POST'])
+def Create_Pass_Shopping(request):
+	return Response(Pass.create_pass(request.data))
+
+@api_view(['POST'])
+def Cancel_All_Shopping(request):
+	return Response(Pass.cancel_all_invoices(request.data))
