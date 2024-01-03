@@ -161,6 +161,7 @@ class Invoice(models.Model):
 				serialized_invoice = serializers.serialize('json', [invoice])
 				invoice = json.loads(serialized_invoice)[0]['fields']
 				History_Invoice.create_history_invoice(invoice, employee, 'Created')
+				
 			else:
 				result = license['result']
 				message = license['message']

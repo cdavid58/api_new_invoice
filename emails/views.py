@@ -5,3 +5,11 @@ from .models import *
 @api_view(['POST'])
 def Create_Email(request):
 	return Response(Emails.create_email(request.data))
+
+@api_view(['GET'])
+def Get_List_Emails(request):
+	return Response(Emails.get_list_emails(request.data))
+
+@api_view(['PUT'])
+def Is_Read(request):
+	return Response(Emails.is_read(request.data))

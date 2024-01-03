@@ -145,6 +145,24 @@ class Branch(models.Model):
 			message = str(e)
 		return {'result':result, 'message':message}
 
+
+	@classmethod
+	def update_branch(cls, data):
+		result = False
+		message = None
+		try:
+			branch = cls.objects.get(pk = data['pk_branch'])
+			branch.name = data['business_name']
+			branch.address = data['address']
+			branch.phone = data['phone']
+			branch.email = data['email']
+			branch.save()
+			result = True
+			message = "Success"
+		except Exception as e:
+			message = str(e)
+		return {'result':result, 'message':message}
+
 	@classmethod
 	def add_branch(cls,data):
 		result = False
