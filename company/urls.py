@@ -11,4 +11,5 @@ urlpatterns=[
 	url(r'^Update_Resolution_DIAN/$',Update_Resolution_DIAN,name="Update_Resolution_DIAN"),
 	url(r'^Get_Branch/$',Get_Branch,name="Get_Branch"),
 	url(r'^Get_Resolution_List/$',Get_Resolution_List,name="Get_Resolution_List"),
+	url(r'^Update_Date_License/$',Update_Date_License,name="Update_Date_License"),
 ]

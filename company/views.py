@@ -42,3 +42,7 @@ def Get_Branch(request):
 @api_view(['GET'])
 def Get_Resolution_List(request):
 	return Response(Resolution.get_resolution_list(request.data))	
+
+@api_view(['GET'])
+def Update_Date_License(request):
+	return Response(License.update_date_license(request.data))	

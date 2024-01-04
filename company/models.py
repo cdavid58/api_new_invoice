@@ -465,7 +465,7 @@ class Consecutive(models.Model):
 
 		
 from dateutil.relativedelta import relativedelta
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta, date
 
 class License(models.Model):
 	price = models.IntegerField(null = True, blank = True)
@@ -480,39 +480,39 @@ class License(models.Model):
 		data = {}
 		if obj.price == 0:
 			data = {
-				'document':10,
+				'document':5,
 				'user':1,
 				'expiration_date': obj.date_registration  + timedelta(days=365)
 			}
-		elif obj.price == 18700:
+		elif obj.price == 62500:
 			data = {
-				'document':120,
+				'document':750,
 				'user':1,
 				'expiration_date': obj.date_registration  + relativedelta(months=1)
 			}
-		elif obj.price == 72500:
-			data = {
-				'document':120,
-				'user':1,
-				'expiration_date': obj.date_registration  + relativedelta(months=1)
-			}
-		elif obj.price == 168000:
+		elif obj.price == 84000:
 			data = {
 				'document':1500,
+				'user':1,
+				'expiration_date': obj.date_registration  + relativedelta(months=1)
+			}
+		elif obj.price == 209000:
+			data = {
+				'document':6000,
 				'user':3,
 				'expiration_date': obj.date_registration  + relativedelta(months=1)
 			}
-		elif obj.price == 191250:
+		elif obj.price == 225000:
 			data = {
-				'document':50000000,
+				'document':12000,
 				'user':5,
 				'expiration_date': obj.date_registration  + relativedelta(months=1)
 			}
-		elif obj.price == 950000:
+		elif obj.price == 2300000:
 			data = {
 				'document':50000000,
-				'user':8,
-				'expiration_date': obj.date_registration  + relativedelta(months=1)
+				'user':10000,
+				'expiration_date': obj.date_registration  + timedelta(days=365)
 			}
 		return data
 
@@ -554,6 +554,20 @@ class License(models.Model):
 			message = "Success"
 		return {'result':result, 'message': message}
 		
+	@classmethod
+	def update_date_license(cls, data):
+		result = False
+		message = None
+		try:
+			license = cls.objects.get(branch = Branch.objects.get(pk = data['pk_branch']))
+			fecha = date.today() + timedelta(days=365) if license.price == 0 or license.price == 2300000 else date.today() + relativedelta(months=1)
+			license.expiration_date = fecha
+			license.save()
+			result = True
+			message = "Success"
+		except Exception as e:
+			message = str(e)
+		return {'result':result, 'message': message}
 
 
 	@classmethod

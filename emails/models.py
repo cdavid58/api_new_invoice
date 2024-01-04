@@ -1,6 +1,6 @@
 from user.models import Employee
 from django.db import models
-import json, base64, tempfile
+import json, base64, tempfile, env
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db.models import Q
@@ -81,9 +81,47 @@ class Emails(models.Model):
 		_data = []
 		try:
 			employee = Employee.objects.get(pk = data['pk_employee'])
-			for i in cls.objects.filter(Q(sender=employee) | Q(receives=employee)).order_by('-date_register'):
+			# for i in cls.objects.filter(Q(sender=employee) | Q(receives=employee)).order_by('-date_register'):
+			for i in cls.objects.filter(receives=employee).order_by('-date_register'):
 				_value = json.loads( serializers.serialize('json', [i] ))[0]
 				_value['fields']['diferencia'] = cls.Calculate_Value(_value['fields']['date_register'])
+				_value['sender'] = {
+					'pk_employee': employee.pk,
+					'name': employee.first_name+' '+employee.surname,
+				}
+				files = []
+				for j in Attached_Files.objects.filter(email=i):
+					files.append({
+						'url_files':f"{env.URL_LOCAL}{j.file.url}"
+						})
+				_value['files'] = files
+				_data.append(_value)
+			result = True
+			message = "Success"
+		except Exception as e:
+			message = str(e)
+		return {'result':result, 'message':message, 'data':_data}
+
+	@classmethod
+	def get_list_emails_sender(cls, data):
+		result = False
+		message = None
+		_data = []
+		try:
+			employee = Employee.objects.get(pk = data['pk_employee'])
+			for i in cls.objects.filter(sender=employee).order_by('-date_register'):
+				_value = json.loads( serializers.serialize('json', [i] ))[0]
+				_value['fields']['diferencia'] = cls.Calculate_Value(_value['fields']['date_register'])
+				_value['sender'] = {
+					'pk_employee': employee.pk,
+					'name': employee.first_name+' '+employee.surname,
+				}
+				files = []
+				for j in Attached_Files.objects.filter(email=i):
+					files.append({
+						'url_files':f"{env.URL_LOCAL}{j.file.url}"
+						})
+				_value['files'] = files
 				_data.append(_value)
 			result = True
 			message = "Success"

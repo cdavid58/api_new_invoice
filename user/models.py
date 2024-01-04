@@ -29,6 +29,7 @@ class Employee(models.Model):
     login_attempts = models.PositiveIntegerField(default=0)
     permission = models.ManyToManyField(Permission, blank = True, null = True)
     active = models.BooleanField(default = False)
+    internal_email = models.EmailField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.first_name} {self.surname}"
@@ -150,7 +151,8 @@ class Employee(models.Model):
                         email = data['email'],
                         branch = branch,
                         user_name = data['user_name'].lower(),
-                        psswd = get_random_string(length=20) if data['psswd'] is None else data['psswd']
+                        psswd = get_random_string(length=20) if data['psswd'] is None else data['psswd'],
+                        internal_email = f"{data['user_name'].lower()}@{branch.name.lower().replace(' ','_')}.com"
                     )
                     employee.save()
                     License.discount_user(branch)

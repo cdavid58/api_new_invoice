@@ -13,3 +13,12 @@ def Get_List_Emails(request):
 @api_view(['PUT'])
 def Is_Read(request):
 	return Response(Emails.is_read(request.data))
+
+
+@api_view(['GET'])
+def Get_List_Email_Sender(request):
+	return Response(Emails.get_list_emails_sender(request.data))
+
+
+
+
