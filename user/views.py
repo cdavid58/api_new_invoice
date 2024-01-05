@@ -34,3 +34,7 @@ def Delete_User(request):
 @api_view(['GET'])
 def Query_Permissions(request):
 	return Response(Employee.query_permissions(request.data))
+
+@api_view(['GET'])
+def Get_List_Email(request):
+	return Response(Employee.get_list_email(request.data))

@@ -31,6 +31,20 @@ class Employee(models.Model):
     active = models.BooleanField(default = False)
     internal_email = models.EmailField(null=True, blank=True)
 
+    @classmethod
+    def get_list_email(cls, data):
+        _data = []
+        branch = Branch.objects.get(pk = data['pk_branch'])
+        for i in Branch.objects.filter(company = branch.company):
+            e = cls.objects.filter(branch = i)
+            for j in e:
+                if j.internal_email is not None:
+                    _data.append({
+                        "pk_employee": j.pk,
+                        "internal_email": j.internal_email,
+                        })
+        return _data
+
     def __str__(self):
         return f"{self.first_name} {self.surname}"
 

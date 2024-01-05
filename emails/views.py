@@ -19,6 +19,10 @@ def Is_Read(request):
 def Get_List_Email_Sender(request):
 	return Response(Emails.get_list_emails_sender(request.data))
 
+@api_view(['GET'])
+def Get_Email(request):
+	return Response(Emails.get_email(request.data))
+
 
 
 

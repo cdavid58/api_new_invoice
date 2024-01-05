@@ -8,13 +8,76 @@ from django.core import serializers
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 
+class ReadStatus(models.Model):
+    email = models.ForeignKey("Emails", on_delete=models.CASCADE)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+    is_read = models.BooleanField(default=False)
+
 class Emails(models.Model):
 	sender = models.ForeignKey(Employee, on_delete= models.CASCADE, related_name="envia")
-	receives = models.ForeignKey(Employee, on_delete= models.CASCADE, related_name="recibe")
+	receives = models.ManyToManyField(Employee)
 	subject = models.CharField(max_length= 255, null = True, blank= True)
 	message = models.TextField()
 	date_register = models.DateTimeField(auto_now_add= True, null = True, blank= True)
-	is_read_email = models.BooleanField(default= False, blank=True, null=True)
+
+	def __str__(self):
+		sender_name = f"From: {self.sender.first_name} {self.sender.surname}"
+		receives_names = ", ".join([f"{receiver.first_name} {receiver.surname}" for receiver in self.receives.all()])
+		subject = f"Subject: {self.subject}"
+		date_register = f"Date: {self.date_register}"
+
+		return f"{sender_name}\nTo: {receives_names}\n{subject}\n{date_register}\nMessage: {self.message[:50]}..."
+
+	@classmethod
+	def get_list_emails(cls, data):
+	    result = False
+	    message = None
+	    _data = []
+	    try:
+	        employee = Employee.objects.get(pk=data['pk_employee'])
+	        for email in cls.objects.filter(receives=employee).order_by('-date_register'):
+	            _value = json.loads(serializers.serialize('json', [email]))[0]
+	            _value['fields']['diferencia'] = cls.Calculate_Value(_value['fields']['date_register'])
+	            _value['sender'] = {
+	                'pk_employee': employee.pk,
+	                'name': employee.first_name + ' ' + employee.surname,
+	            }
+	            read_status, created = ReadStatus.objects.get_or_create(email=email, employee=employee)
+	            _value['is_read'] = read_status.is_read
+
+	            files = []
+	            for j in Attached_Files.objects.filter(email=email):
+	                files.append({
+	                    'url_files': f"{env.URL_LOCAL}{j.file.url}"
+	                })
+	            _value['files'] = files
+	            _data.append(_value)
+	        result = True
+	        message = "Success"
+	    except Exception as e:
+	        message = str(e)
+
+	    return {'result': result, 'message': message, 'data': _data}
+
+
+	@classmethod
+	def get_email(cls, data):
+		email = cls.objects.get(pk = data['pk_email'])
+		_data = json.loads( serializers.serialize('json', [email] ))[0]
+		_data['fields']['diferencia'] = cls.Calculate_Value(_data['fields']['date_register'])
+		_data['receives'] = [
+			{
+				"email":json.loads( serializers.serialize('json', [i] ))[0]['fields']['internal_email'],
+				"name":f"{json.loads( serializers.serialize('json', [i] ))[0]['fields']['first_name']} {json.loads( serializers.serialize('json', [i] ))[0]['fields']['surname']}"
+			}
+			for i in email.receives.all()
+		]
+		file = Attached_Files.objects.get(email = email)
+		url_file = f"{env.URL_LOCAL}{file.file.url}"
+		print(file.file)
+		file_content_base64 = base64.b64encode(file.file.read()).decode("utf-8")
+		_data['file'] = {"url":url_file,'name':str(file.file)}
+		return _data
 
 	@staticmethod
 	def Calculate_Value(Time):
@@ -60,47 +123,30 @@ class Emails(models.Model):
 		try:
 			email = cls(
 				sender = Employee.objects.get(pk = data['sender']),
-				receives = Employee.objects.get(pk = data['receives']),
 				subject = data['subject'],
 				message = data['message']
 			)
 			email.save()
+			for i in data['receives']:
+				email.receives.add(Employee.objects.get(pk = int(i)))
 			message = "Success"
 			result = True
-			if len(data['files']) > 0:
-				return Attached_Files.save_files(data,email)
+			return Attached_Files.save_files(data['file'],email)
 		except Exception as e:
 			message = str(e)
+			print(e,'ERROR EMAIL')
 		return {'result':result, 'message':message}
 
-
 	@classmethod
-	def get_list_emails(cls, data):
-		result = False
-		message = None
-		_data = []
-		try:
-			employee = Employee.objects.get(pk = data['pk_employee'])
-			# for i in cls.objects.filter(Q(sender=employee) | Q(receives=employee)).order_by('-date_register'):
-			for i in cls.objects.filter(receives=employee).order_by('-date_register'):
-				_value = json.loads( serializers.serialize('json', [i] ))[0]
-				_value['fields']['diferencia'] = cls.Calculate_Value(_value['fields']['date_register'])
-				_value['sender'] = {
-					'pk_employee': employee.pk,
-					'name': employee.first_name+' '+employee.surname,
-				}
-				files = []
-				for j in Attached_Files.objects.filter(email=i):
-					files.append({
-						'url_files':f"{env.URL_LOCAL}{j.file.url}"
-						})
-				_value['files'] = files
-				_data.append(_value)
-			result = True
-			message = "Success"
-		except Exception as e:
-			message = str(e)
-		return {'result':result, 'message':message, 'data':_data}
+	def mark_as_read(cls, data):
+	    email = cls.objects.get(pk=data['pk_email'])
+	    receiver = Employee.objects.get(pk=data['pk_employee'])
+	    read_status, created = ReadStatus.objects.get_or_create(email=email, employee=receiver)
+	    if not read_status.is_read:
+	        read_status.is_read = True
+	        read_status.save()
+
+	    return {'result': True}
 
 	@classmethod
 	def get_list_emails_sender(cls, data):
@@ -108,21 +154,23 @@ class Emails(models.Model):
 		message = None
 		_data = []
 		try:
-			employee = Employee.objects.get(pk = data['pk_employee'])
-			for i in cls.objects.filter(sender=employee).order_by('-date_register'):
-				_value = json.loads( serializers.serialize('json', [i] ))[0]
-				_value['fields']['diferencia'] = cls.Calculate_Value(_value['fields']['date_register'])
-				_value['sender'] = {
-					'pk_employee': employee.pk,
-					'name': employee.first_name+' '+employee.surname,
-				}
-				files = []
-				for j in Attached_Files.objects.filter(email=i):
-					files.append({
-						'url_files':f"{env.URL_LOCAL}{j.file.url}"
-						})
-				_value['files'] = files
-				_data.append(_value)
+			employee = Employee.objects.get(pk=data['pk_employee'])
+			for email in cls.objects.filter(receives=employee).order_by('-date_register'):
+			    _value = json.loads(serializers.serialize('json', [email]))[0]
+			    _value['fields']['diferencia'] = cls.Calculate_Value(_value['fields']['date_register'])
+			    _value['sender'] = {
+			        'pk_employee': employee.pk,
+			        'name': employee.first_name + ' ' + employee.surname,
+			    }
+			    read_status, created = ReadStatus.objects.get_or_create(email=email, employee=employee)
+			    _value['is_read'] = read_status.is_read
+			    files = []
+			    for j in Attached_Files.objects.filter(email=email):
+			        files.append({
+			            'url_files': f"{env.URL_LOCAL}{j.file.url}"
+			        })
+			    _value['files'] = files
+			    _data.append(_value)
 			result = True
 			message = "Success"
 		except Exception as e:
@@ -134,30 +182,33 @@ class Attached_Files(models.Model):
 	file = models.FileField(upload_to= "files_emails")
 
 	def __str__(self):
-		return f"{self.email.subject} - {self.email.receives.first_name} {self.email.receives.first_name}  by {self.email.sender.first_name} {self.email.sender.first_name} ----- {self.email.sender.branch.name}"
+	    subject = self.email.subject
+	    receives_names = ', '.join([f"{receiver.first_name} {receiver.surname}" for receiver in self.email.receives.all()])
+	    sender_names = f"{self.email.sender.first_name} {self.email.sender.surname}"
+	    branch_name = self.email.sender.branch.name
+	    return f"{subject} - {receives_names} by {sender_names} ----- {branch_name}"
+
+
 
 	@classmethod
 	def save_files(cls, data, email):
 		result = False
 		message = None
 		try:
-		    for i in data.get('files', []):
-		        try:
-		            file_data = base64.b64decode(i.get('base_64', ''))
-		            file_name = i.get('name_file', 'unknown_file')
-		            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-		                temp_file.write(file_data)
-		            saved_file_path = default_storage.save(file_name, ContentFile(file_data))
-		            file_instance = cls(
-		                email=email,
-		                file=saved_file_path
-		            )
-		            file_instance.save()
-		            result = True
-		            message = "Success"
-		        except Exception as e:
-		            message = str(e)
-		            result = False
+			file_data = base64.b64decode(data['base_64'])
+			file_name = data['name_file']
+			with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+			    temp_file.write(file_data)
+			saved_file_path = default_storage.save(file_name, ContentFile(file_data))
+			file_instance = cls(
+			    email=email,
+			    file=saved_file_path
+			)
+			file_instance.save()
+			result = True
+			message = "Success"
 		except Exception as e:
 		    message = str(e)
+		    result = False
+		    print(e,'ERROR FILES')
 		return {'result': result, 'message': message}
